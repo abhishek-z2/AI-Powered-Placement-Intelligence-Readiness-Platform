@@ -6,6 +6,7 @@ const pool = require('../db/pool');
 const { extractResumeData, generateInterviewQuestions } = require('../services/geminiService');
 const { normalizeSkills } = require('../utils/normalizeSkills');
 const { computeRoleReadiness, computeOverallReadiness } = require('../services/rankingService');
+const { authenticate } = require('../middleware/authMiddleware');
 
 // Multer — store file in memory for pdf-parse
 const upload = multer({
@@ -18,7 +19,7 @@ const upload = multer({
 });
 
 // POST /students/upload-resume
-router.post('/upload-resume', upload.single('resume'), async (req, res) => {
+router.post('/upload-resume', authenticate, upload.single('resume'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No PDF file uploaded' });
 
@@ -45,11 +46,12 @@ router.post('/upload-resume', upload.single('resume'), async (req, res) => {
         const yearValue = extracted.year ? parseInt(extracted.year, 10) : null;
         const experienceValue = extracted.experience_years ? parseFloat(extracted.experience_years) : 0;
 
-        // Insert student into DB
+        // Insert student into DB with user_id from authenticated user
         const studentResult = await pool.query(
-            `INSERT INTO students (name, department, year, experience_years, technical_skills, soft_skills, readiness_score, suggested_roles)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            `INSERT INTO students (user_id, name, department, year, experience_years, technical_skills, soft_skills, readiness_score, suggested_roles)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [
+                req.user.userId,
                 extracted.name || 'Unknown',
                 extracted.department || '',
                 yearValue,

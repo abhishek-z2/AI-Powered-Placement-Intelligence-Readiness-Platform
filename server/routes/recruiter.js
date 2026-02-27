@@ -4,6 +4,11 @@ const pool = require('../db/pool');
 const { extractJDData } = require('../services/geminiService');
 const { normalizeSkills } = require('../utils/normalizeSkills');
 const { rankStudents } = require('../services/rankingService');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
+
+// Apply authentication to all recruiter routes
+router.use(authenticate);
+router.use(requireRole('recruiter'))
 
 // POST /recruiter/upload-jd
 router.post('/upload-jd', async (req, res) => {

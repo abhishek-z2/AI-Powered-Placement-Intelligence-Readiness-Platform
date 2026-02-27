@@ -3,6 +3,11 @@ const router = express.Router();
 const pool = require('../db/pool');
 const roleSkillMap = require('../utils/roleSkillMap');
 const { computeRoleReadiness } = require('../services/rankingService');
+const { authenticate, requireRole } = require('../middleware/authMiddleware');
+
+// Apply authentication to all analytics routes
+router.use(authenticate);
+router.use(requireRole('officer'));
 
 // GET /analytics/roles
 router.get('/roles', async (req, res) => {
