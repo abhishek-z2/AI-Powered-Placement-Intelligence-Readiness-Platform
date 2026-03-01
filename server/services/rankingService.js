@@ -1,16 +1,27 @@
 const roleSkillMap = require('../utils/roleSkillMap');
+const { computeScore, normalizeSkill } = require('../utils/skillOntology');
 
 /**
  * Compute role-wise readiness for a single student.
  * Returns an object like: { frontend: 0.75, backend: 0.4, ... }
  */
 function computeRoleReadiness(technicalSkills = []) {
-    const studentSkills = new Set(technicalSkills.map(s => s.toLowerCase().trim()));
+    const { getBestWeight, normalizeSkill } = require('../utils/skillOntology');
+    const studentSkills = (technicalSkills || []).map(s => normalizeSkill(s));
     const readiness = {};
 
     for (const [role, requiredSkills] of Object.entries(roleSkillMap)) {
-        const matched = requiredSkills.filter(s => studentSkills.has(s)).length;
-        readiness[role] = requiredSkills.length > 0 ? matched / requiredSkills.length : 0;
+        let totalWeight = 0;
+
+        // Sum up the best weight for each required skill in the role
+        for (const req of requiredSkills) {
+            totalWeight += getBestWeight(req, studentSkills);
+        }
+
+        // Apply a small saturation factor: if you have 80% coverage, we treat it as 100% role-ready
+        // This stops "overqualified" people from being penalized by missing one niche tag.
+        const saturationPoint = Math.max(requiredSkills.length * 0.8, 1);
+        readiness[role] = Math.min(totalWeight / saturationPoint, 1.0);
     }
 
     return readiness;
@@ -27,56 +38,108 @@ function computeOverallReadiness(technicalSkills = []) {
 }
 
 /**
- * Deterministic ranking engine.
- * Ranks students against a structured JD.
- * Gemini is NOT involved here.
+ * Get the match weight between a student skill and a required skill.
+ * Uses the new skill ontology with sibling groups and domain mapping.
+ * 
+ * Returns:
+ *   1.0 - Exact match
+ *   0.8 - Direct parent match
+ *   0.7 - Indirect ancestor match
+ *   0.6 - Sibling match (same tech family)
+ *   0.5 - Domain match only
+ *   0   - No relation
+ * 
+ * @param {string} studentSkill - The skill the student has
+ * @param {string} requiredSkill - The skill that is required
+ * @returns {number} Match weight (0 to 1.0)
+ */
+function getSkillMatchWeight(studentSkill, requiredSkill) {
+    const { getBestWeight } = require('../utils/skillOntology');
+    const studentSkills = [normalizeSkill(studentSkill)];
+    return getBestWeight(requiredSkill, studentSkills);
+}
+
+/**
+ * Deterministic ranking engine with enhanced skill ontology.
+ * Uses sibling groups, domain mapping, and aliases for better matching.
+ * 
+ * Scoring Model:
+ * 1. Required Skill Matching (hierarchy-based weighted partial credit)
+ *    - Exact match: 1.0
+ *    - Direct parent: 0.8
+ *    - Indirect ancestor: 0.7
+ *    - Sibling (same tech family): 0.6
+ *    - Domain match only: 0.5
+ *    - No relation: 0.0
+ * 2. Required Threshold Gate (reject if < 0.5)
+ * 3. Non-Linear Boost (power of 1.3)
+ * 4. Preferred Skills (hierarchy-based, no boost)
+ * 5. Experience Score
+ * 6. Final Score: (boostedRequired * 0.5) + (preferredMatchRatio * 0.25) + (experienceScore * 0.25)
  */
 function rankStudents(students, jd) {
     const { required_skills = [], preferred_skills = [], min_experience_years = 0 } = jd;
 
-    const normalizedRequired = required_skills.map(s => s.toLowerCase().trim());
-    const normalizedPreferred = preferred_skills.map(s => s.toLowerCase().trim());
+    // Normalize skills using the ontology's normalizeSkill function
+    const normalizedRequired = required_skills.map(s => normalizeSkill(s));
+    const normalizedPreferred = preferred_skills.map(s => normalizeSkill(s));
 
     const ranked = students.map(student => {
-        const studentSkills = new Set((student.technical_skills || []).map(s => s.toLowerCase().trim()));
+        // Get student's normalized skills
+        const studentSkills = (student.technical_skills || []).map(s => normalizeSkill(s));
 
-        // Required skills match ratio
-        const matchedRequired = normalizedRequired.filter(s => studentSkills.has(s)).length;
-        const requiredScore = normalizedRequired.length > 0 ? matchedRequired / normalizedRequired.length : 1;
+        // Use the new computeScore function from skillOntology
+        const result = computeScore(
+            {
+                skills: studentSkills,
+                experience: student.experience_years || 0
+            },
+            {
+                required: normalizedRequired,
+                preferred: normalizedPreferred,
+                minExp: min_experience_years
+            }
+        );
 
-        // Preferred skills match ratio
-        const matchedPreferred = normalizedPreferred.filter(s => studentSkills.has(s)).length;
-        const preferredScore = normalizedPreferred.length > 0 ? matchedPreferred / normalizedPreferred.length : 1;
+        // Determine missing skills: Only show if they have ZERO match (no sibling/parent credit)
+        const { getBestWeight } = require('../utils/skillOntology');
+        const missingSkills = normalizedRequired.filter(req =>
+            getBestWeight(req, studentSkills) === 0
+        );
 
-        // Experience score
-        const studentExp = student.experience_years || 0;
-        const experienceScore = min_experience_years > 0
-            ? Math.min(studentExp / min_experience_years, 1)
-            : 1;
-
-        // Weighted final score
-        const finalScore = (requiredScore * 0.6) + (preferredScore * 0.2) + (experienceScore * 0.2);
-
-        // Missing required skills
-        const missingSkills = normalizedRequired.filter(s => !studentSkills.has(s));
+        // Calculate display scores (in percentage)
+        const requiredScoreDisplay = Math.round(result.requiredMatchRatio * 100);
+        const preferredScoreDisplay = result.gated ? 0 : Math.round(result.preferredMatchRatio * 100);
+        const experienceScoreDisplay = result.gated ? 0 : Math.round(result.experienceScore * 100);
 
         return {
             id: student.id,
             name: student.name,
             department: student.department,
             year: student.year,
-            experience_years: studentExp,
+            experience_years: student.experience_years || 0,
             technical_skills: student.technical_skills,
-            finalScore: Math.round(finalScore * 100) / 100,
-            matchPercentage: Math.round(finalScore * 100),
+            finalScore: Math.round(result.finalScore * 100) / 100,
+            matchPercentage: Math.round(result.finalScore * 100),
             missingSkills,
-            requiredScore: Math.round(requiredScore * 100),
-            preferredScore: Math.round(preferredScore * 100),
-            experienceScore: Math.round(experienceScore * 100),
+            requiredScore: requiredScoreDisplay,
+            preferredScore: preferredScoreDisplay,
+            experienceScore: experienceScoreDisplay,
+            // Additional breakdown for UI display
+            requiredBreakdown: result.requiredBreakdown || [],
+            preferredBreakdown: result.preferredBreakdown || [],
+            boostedRequired: result.boostedRequired || 0,
+            gated: result.gated || false,
         };
     });
 
     return ranked.sort((a, b) => b.finalScore - a.finalScore);
 }
 
-module.exports = { computeRoleReadiness, computeOverallReadiness, rankStudents };
+module.exports = {
+    computeRoleReadiness,
+    computeOverallReadiness,
+    rankStudents,
+    getSkillMatchWeight
+};
+

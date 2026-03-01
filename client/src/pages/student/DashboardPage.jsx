@@ -1,6 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/index';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 const ROLE_LABELS = {
     frontend: '🖥️ Frontend Dev',
@@ -42,6 +65,7 @@ export default function DashboardPage() {
     const navigate = useNavigate();
 
     const [student, setStudent] = useState(null);
+    const [history, setHistory] = useState([]);
     const [projects, setProjects] = useState([]);
     const [roleReadiness, setRoleReadiness] = useState({});
     const [questions, setQuestions] = useState([]);
@@ -51,28 +75,74 @@ export default function DashboardPage() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (!id) {
-            setError('No student ID provided. Please upload a resume first.');
-            setLoading(false);
-            return;
+        if (id) {
+            fetchStudent();
+        } else {
+            fetchHistory();
         }
-        const fetchStudent = async () => {
-            try {
-                const res = await api.get(`/students/${id}`);
-                const { projects, roleReadiness, ...studentData } = res.data;
-                setStudent(studentData);
-                setProjects(projects || []);
-                setRoleReadiness(roleReadiness || {});
-            } catch (err) {
-                setError(err.response?.data?.error || 'Failed to load student profile.');
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchStudent();
     }, [id]);
 
+    const fetchHistory = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/students/my-history');
+            setHistory(res.data);
+            setError('');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to load history.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchStudent = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/students/${id}`);
+            const { projects, roleReadiness, ...studentData } = res.data;
+            setStudent(studentData);
+            setProjects(projects || []);
+            setRoleReadiness(roleReadiness || {});
+            setError('');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to load student profile.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (e, assessmentId) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!window.confirm('Are you sure you want to remove this resume from your history?')) return;
+        try {
+            await api.delete(`/students/${assessmentId}`);
+            if (id && id === String(assessmentId)) {
+                navigate('/student/dashboard');
+            } else {
+                setHistory(history.filter(h => h.id !== assessmentId));
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to delete assessment.');
+        }
+    };
+
+    const handleSetActive = async (e, assessmentId) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await api.post('/students/set-active', { assessmentId });
+            setHistory(history.map(h => ({
+                ...h,
+                isActive: h.id === assessmentId
+            })));
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to set active resume.');
+        }
+    };
+
     const handleGenerateQuestions = async () => {
+        if (!id) return;
         setQuestLoading(true);
         setQuestError('');
         try {
@@ -89,12 +159,12 @@ export default function DashboardPage() {
         return (
             <div className="spinner-wrap">
                 <div className="spinner" />
-                <span className="spinner-text">Loading your profile…</span>
+                <span className="spinner-text">Loading...</span>
             </div>
         );
     }
 
-    if (error) {
+    if (error && !id) {
         return (
             <div style={{ padding: '2rem' }}>
                 <div className="alert alert-error">{error}</div>
@@ -105,28 +175,210 @@ export default function DashboardPage() {
         );
     }
 
+    // --- Render History View ---
+    if (!id) {
+        // Prepare chart data (chronological order)
+        const chronHistory = [...history].reverse();
+        const chartData = {
+            labels: chronHistory.map(h => new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+            datasets: [
+                {
+                    label: 'Readiness Score %',
+                    data: chronHistory.map(h => Math.round(h.readiness_score * 100)),
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#6366f1',
+                    pointRadius: 4,
+                }
+            ]
+        };
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: (ctx) => `Score: ${ctx.raw}%`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: 'rgba(255, 255, 255, 0.5)', stepSize: 20 }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: 'rgba(255, 255, 255, 0.5)' }
+                }
+            }
+        };
+
+        return (
+            <div className="dashboard-page">
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">My Resume History</h1>
+                        <p className="page-subtitle">Track your progress and view past readiness reports</p>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => navigate('/student/upload')}>
+                        Upload New Resume
+                    </button>
+                </div>
+
+                {history.length > 1 && (
+                    <div className="card chart-card">
+                        <div className="section-title" style={{ marginBottom: '1.5rem' }}>📈 Skill Growth Journey</div>
+                        <div style={{ height: '240px' }}>
+                            <Line data={chartData} options={chartOptions} />
+                        </div>
+                    </div>
+                )}
+
+                {history.length === 0 ? (
+                    <div className="card empty-state-card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
+                        <h2>No Resumes Found</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                            You haven't uploaded any resumes yet. Start by analyzing your first resume.
+                        </p>
+                        <button className="btn btn-primary" onClick={() => navigate('/student/upload')}>
+                            Upload My First Resume
+                        </button>
+                    </div>
+                ) : (
+                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <table className="ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Suggested For</th>
+                                    <th>Overall Score</th>
+                                    <th>Experience</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.map((h) => (
+                                    <tr key={h.id} className="history-row">
+                                        <td>
+                                            <div style={{ fontWeight: '500' }}>
+                                                {new Date(h.created_at).toLocaleDateString(undefined, {
+                                                    month: 'short', day: 'numeric', year: 'numeric'
+                                                })}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                {new Date(h.created_at).toLocaleTimeString(undefined, {
+                                                    hour: '2-digit', minute: '2-digit'
+                                                })}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                {h.suggested_roles?.slice(0, 2).map((role, idx) => (
+                                                    <span key={idx} className="chip chip-role" style={{ fontSize: '0.7rem' }}>
+                                                        {ROLE_LABELS[role] || role}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div className="history-score-bar">
+                                                    <div
+                                                        className="history-score-fill"
+                                                        style={{
+                                                            width: `${Math.round(h.readiness_score * 100)}%`,
+                                                            backgroundColor: h.readiness_score >= 0.7 ? 'var(--accent-green)' : h.readiness_score >= 0.4 ? 'var(--accent-orange)' : 'var(--accent-red)'
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 'bold' }}>{Math.round(h.readiness_score * 100)}%</span>
+                                                    {h.growth !== 0 && (
+                                                        <span className={`growth-badge ${h.growth > 0 ? 'growth-up' : 'growth-down'}`}>
+                                                            {h.growth > 0 ? '↑' : '↓'} {Math.abs(h.growth)}%
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {h.experience_years > 0 ? `${h.experience_years}y` : 'Fresher'}
+                                                {h.isActive && <span className="active-status-tag">Active</span>}
+                                            </div>
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
+                                                <button
+                                                    className={`btn btn-ghost btn-sm toggle-active-btn ${h.isActive ? 'is-active' : ''}`}
+                                                    onClick={(e) => handleSetActive(e, h.id)}
+                                                    title={h.isActive ? "This is your active resume" : "Set as active for recruiters"}
+                                                >
+                                                    {h.isActive ? '★' : '☆'}
+                                                </button>
+                                                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/student/dashboard/${h.id}`)}>
+                                                    View Report
+                                                </button>
+                                                <button className="btn btn-ghost btn-danger btn-sm" onClick={(e) => handleDelete(e, h.id)}>
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // --- Render Report View (with ID) ---
     const overallScore = Object.values(roleReadiness).length
         ? Object.values(roleReadiness).reduce((s, v) => s + v, 0) / Object.values(roleReadiness).length
         : 0;
 
     return (
         <div className="dashboard-page">
-            {/* Header */}
             <div className="page-header dash-header">
-                <div>
-                    <h1 className="page-title">Welcome, {student.name} 👋</h1>
-                    <p className="page-subtitle">
-                        {student.department && `${student.department} · `}
-                        {student.year ? `Year ${student.year} · ` : ''}
-                        {student.experience_years > 0 ? `${student.experience_years}y experience` : 'Fresher'}
-                    </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button className="btn btn-ghost" onClick={() => navigate('/student/dashboard')}>
+                        ← Back to History
+                    </button>
+                    <div>
+                        <h1 className="page-title">Resume Report: {student.name}</h1>
+                        <p className="page-subtitle">
+                            {student.department && `${student.department} · `}
+                            {student.year ? `Year ${student.year} · ` : ''}
+                            {student.experience_years > 0 ? `${student.experience_years}y experience` : 'Fresher'}
+                            {' · Analyzed on ' + new Date(student.created_at).toLocaleDateString()}
+                        </p>
+                    </div>
                 </div>
-                <ScoreBadge score={overallScore} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button className="btn btn-ghost btn-danger" onClick={(e) => handleDelete(e, student.id)}>
+                        Delete Resume
+                    </button>
+                    <ScoreBadge score={overallScore} />
+                </div>
             </div>
 
-            {/* Top Grid: Skills */}
             <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
-                {/* Technical Skills */}
                 <div className="card">
                     <div className="section-title">⚡ Technical Skills</div>
                     <div className="chips-group">
@@ -139,7 +391,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Soft Skills */}
                 <div className="card">
                     <div className="section-title">🌟 Soft Skills</div>
                     <div className="chips-group">
@@ -153,7 +404,6 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Role Readiness */}
             <div className="card" style={{ marginBottom: '1.25rem' }}>
                 <div className="section-title">🎯 Role Readiness Breakdown</div>
                 {Object.entries(roleReadiness).length > 0
@@ -164,9 +414,7 @@ export default function DashboardPage() {
                 }
             </div>
 
-            {/* Suggested Roles + Projects */}
             <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
-                {/* Suggested Roles */}
                 <div className="card">
                     <div className="section-title">💡 AI Suggested Roles</div>
                     <div className="chips-group">
@@ -179,7 +427,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Projects Count */}
                 <div className="card">
                     <div className="section-title">🗂️ Projects</div>
                     {projects.length > 0 ? (
@@ -204,7 +451,6 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Interview Questions */}
             <div className="card">
                 <div className="dash-questions-header">
                     <div>

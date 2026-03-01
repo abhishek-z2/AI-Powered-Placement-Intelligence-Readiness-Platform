@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 const { extractJDData } = require('../services/geminiService');
-const { normalizeSkills } = require('../utils/normalizeSkills');
+const { normalizeForStorage } = require('../utils/skillOntology');
 const { rankStudents } = require('../services/rankingService');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
@@ -22,8 +22,8 @@ router.post('/upload-jd', async (req, res) => {
 
         const jd = {
             role: extracted.role || 'Unknown Role',
-            required_skills: normalizeSkills(extracted.required_skills || []),
-            preferred_skills: normalizeSkills(extracted.preferred_skills || []),
+            required_skills: (extracted.required_skills || []).map(normalizeForStorage),
+            preferred_skills: (extracted.preferred_skills || []).map(normalizeForStorage),
             min_experience_years: extracted.min_experience_years || 0,
         };
 
@@ -42,8 +42,20 @@ router.post('/rankings', async (req, res) => {
             return res.status(400).json({ error: 'Valid JD object is required in request body' });
         }
 
-        // Fetch all students
-        const studentsResult = await pool.query('SELECT * FROM students');
+        // Fetch students but only their ACTIVE assessment
+        // If they haven't set one, we pick the most recent one as a fallback
+        const studentsResult = await pool.query(`
+            WITH active_ids AS (
+                SELECT 
+                    u.id as user_id, 
+                    COALESCE(u.active_assessment_id, (SELECT id FROM students s2 WHERE s2.user_id = u.id ORDER BY created_at DESC LIMIT 1)) as target_id
+                FROM users u
+                WHERE u.role = 'student'
+            )
+            SELECT s.* 
+            FROM students s
+            JOIN active_ids ai ON s.id = ai.target_id
+        `);
         const students = studentsResult.rows;
 
         if (students.length === 0) {

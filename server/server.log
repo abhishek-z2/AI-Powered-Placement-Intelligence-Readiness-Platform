@@ -1,7 +1,10 @@
-Debugger listening on ws://127.0.0.1:40727/82ceccac-ae31-4bc5-88b0-167edb6a6cc3
-For help, see: https://nodejs.org/en/docs/inspector
-Debugger attached.
-[dotenv@17.3.1] injecting env (7) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
-[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+[dotenv@17.3.1] injecting env (7) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+Loaded .env from: /home/achu/AI-Powered-Placement-Intelligence-Readiness-Platform/server/.env
+DB_PASSWORD value: "dyvrymn8"
+DB_USER value: "achu"
+DB_HOST value: "localhost"
+DB_NAME value: "placement_db"
+Final password (first 2 chars): dy***
+✅ Database connected successfully
 🚀 Server running on http://localhost:5000
-Waiting for the debugger to disconnect...
