@@ -416,7 +416,7 @@ export default function DashboardPage() {
 
             <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
                 <div className="card">
-                    <div className="section-title">💡 AI Suggested Roles</div>
+                    <div className="section-title">💡 Suggested Roles</div>
                     <div className="chips-group">
                         {student.suggested_roles?.length > 0
                             ? student.suggested_roles.map((r, i) => (
@@ -456,7 +456,7 @@ export default function DashboardPage() {
                     <div>
                         <div className="section-title">🎤 Interview Prep</div>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            AI-generated questions tailored to your skill profile
+                            Tailored interview questions for your profile
                         </p>
                     </div>
                     <button

@@ -109,19 +109,19 @@ const AuthModal = ({ isOpen, onClose, mode, setMode, setActiveRole }) => {
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
-  
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
-  
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
-  
+
   return children;
 };
 
@@ -164,7 +164,7 @@ const AppContent = () => {
           <div className="navbar-brand">
             <span className="brand-icon">⚡</span>
             <span className="brand-name">PlaceIQ</span>
-            <span className="brand-sub">AI Placement Intelligence</span>
+            <span className="brand-sub">Placement Intelligence</span>
           </div>
           <nav className="navbar-links">
             {user && activeRole === 'student' && (
@@ -203,20 +203,20 @@ const AppContent = () => {
             <Route path="/" element={
               user ? (
                 activeRole === 'student' ? <Navigate to="/student/upload" /> :
-                activeRole === 'recruiter' ? <Navigate to="/recruiter/upload-jd" /> :
-                <Navigate to="/analytics/dashboard" />
+                  activeRole === 'recruiter' ? <Navigate to="/recruiter/upload-jd" /> :
+                    <Navigate to="/analytics/dashboard" />
               ) : (
                 <div className="welcome-section">
                   <h1>Welcome to PlaceIQ</h1>
-                  <p>AI-Powered Placement Intelligence Platform</p>
+                  <p>Smart Placement Intelligence Platform</p>
                   <div className="feature-cards">
                     <div className="feature-card">
                       <h3>🎓 For Students</h3>
-                      <p>Upload your resume and get AI-powered feedback</p>
+                      <p>Upload your resume and get tailored feedback</p>
                     </div>
                     <div className="feature-card">
                       <h3>💼 For Recruiters</h3>
-                      <p>Find the best candidates using AI ranking</p>
+                      <p>Find the best candidates using smart ranking</p>
                     </div>
                     <div className="feature-card">
                       <h3>📊 For Placement Officers</h3>
@@ -259,8 +259,8 @@ const AppContent = () => {
           </Routes>
         </main>
 
-        <AuthModal 
-          isOpen={authModal.isOpen} 
+        <AuthModal
+          isOpen={authModal.isOpen}
           onClose={closeModal}
           mode={authModal.mode}
           setMode={(mode) => setAuthModal({ ...authModal, mode })}

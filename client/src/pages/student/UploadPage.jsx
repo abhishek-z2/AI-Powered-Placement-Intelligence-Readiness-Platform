@@ -49,7 +49,7 @@ export default function UploadPage() {
             <div className="page-header">
                 <h1 className="page-title">Upload Your Resume</h1>
                 <p className="page-subtitle">
-                    Our AI will extract your skills, projects and build your placement profile instantly.
+                    Our system will extract your skills, projects and build your placement profile instantly.
                 </p>
             </div>
 
@@ -95,7 +95,7 @@ export default function UploadPage() {
                         {loading ? (
                             <>
                                 <span className="btn-spinner" />
-                                Analyzing with AI…
+                                Analyzing...
                             </>
                         ) : (
                             <>⚡ Analyze Resume</>
@@ -113,10 +113,10 @@ export default function UploadPage() {
 
                 <div className="upload-features">
                     <div className="feature-item">
-                        <span className="feature-icon">🤖</span>
+                        <span className="feature-icon">⚡</span>
                         <div>
-                            <div className="feature-title">AI Skill Extraction</div>
-                            <div className="feature-desc">Gemini extracts your technical and soft skills automatically</div>
+                            <div className="feature-title">Skill Extraction</div>
+                            <div className="feature-desc">Our system identifies your technical and soft skills automatically</div>
                         </div>
                     </div>
                     <div className="feature-item">
@@ -130,7 +130,7 @@ export default function UploadPage() {
                         <span className="feature-icon">🎯</span>
                         <div>
                             <div className="feature-title">Interview Prep</div>
-                            <div className="feature-desc">Get AI-generated interview questions tailored to your profile</div>
+                            <div className="feature-desc">Get tailored interview questions based on your profile</div>
                         </div>
                     </div>
                 </div>

@@ -35,7 +35,7 @@ export default function UploadJDPage() {
             <div className="page-header">
                 <h1 className="page-title">Upload Job Description</h1>
                 <p className="page-subtitle">
-                    Paste a job description and our AI will extract the role requirements to rank candidates.
+                    Paste a job description and our system will extract the role requirements to rank candidates.
                 </p>
             </div>
 
@@ -66,7 +66,7 @@ We are looking for a Frontend Engineer with 2+ years of experience in React, Jav
                             {loading ? (
                                 <><span className="btn-spinner" /> Extracting…</>
                             ) : (
-                                <>🤖 Extract with AI</>
+                                <>📋 Extract Requirements</>
                             )}
                         </button>
                         {jdText && (
@@ -83,7 +83,7 @@ We are looking for a Frontend Engineer with 2+ years of experience in React, Jav
                     {loading && (
                         <div className="spinner-wrap" style={{ padding: '2rem' }}>
                             <div className="spinner" />
-                            <span className="spinner-text">Gemini is analyzing the JD…</span>
+                            <span className="spinner-text">Analyzing the requirements…</span>
                         </div>
                     )}
 
