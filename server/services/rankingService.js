@@ -1,5 +1,5 @@
 const roleSkillMap = require('../utils/roleSkillMap');
-const { computeScore, normalizeSkill } = require('../utils/skillOntology');
+const { computeScore, normalizeSkill, getBestWeight } = require('../utils/skillOntology');
 
 /**
  * Compute role-wise readiness for a single student.
@@ -28,13 +28,15 @@ function computeRoleReadiness(technicalSkills = []) {
 }
 
 /**
- * Compute the overall readiness score for a student (average across all roles).
+ * Compute the overall readiness score for a student (best score across all roles).
  */
 function computeOverallReadiness(technicalSkills = []) {
     const readiness = computeRoleReadiness(technicalSkills);
     const values = Object.values(readiness);
     if (values.length === 0) return 0;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
+    // We use Math.max because a student's readiness is defined by their BEST role match,
+    // not by an average across roles they aren't meant for.
+    return Math.max(...values);
 }
 
 /**
@@ -102,7 +104,6 @@ function rankStudents(students, jd) {
         );
 
         // Determine missing skills: Only show if they have ZERO match (no sibling/parent credit)
-        const { getBestWeight } = require('../utils/skillOntology');
         const missingSkills = normalizedRequired.filter(req =>
             getBestWeight(req, studentSkills) === 0
         );
@@ -117,6 +118,8 @@ function rankStudents(students, jd) {
             name: student.name,
             department: student.department,
             year: student.year,
+            cgpa: student.cgpa,
+            backlogs: student.backlogs ?? 0,
             experience_years: student.experience_years || 0,
             technical_skills: student.technical_skills,
             finalScore: Math.round(result.finalScore * 100) / 100,
@@ -125,7 +128,6 @@ function rankStudents(students, jd) {
             requiredScore: requiredScoreDisplay,
             preferredScore: preferredScoreDisplay,
             experienceScore: experienceScoreDisplay,
-            // Additional breakdown for UI display
             requiredBreakdown: result.requiredBreakdown || [],
             preferredBreakdown: result.preferredBreakdown || [],
             boostedRequired: result.boostedRequired || 0,

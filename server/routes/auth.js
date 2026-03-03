@@ -8,7 +8,7 @@ const router = express.Router();
 // POST /auth/signup
 router.post('/signup', async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, department_id } = req.body;
 
         // Validate input
         if (!name || !email || !password || !role) {
@@ -31,8 +31,8 @@ router.post('/signup', async (req, res) => {
 
         // Insert user
         const result = await pool.query(
-            'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at',
-            [name, email.toLowerCase(), passwordHash, role]
+            'INSERT INTO users (name, email, password_hash, role, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, department_id, created_at',
+            [name, email.toLowerCase(), passwordHash, role, department_id || null]
         );
 
         const user = result.rows[0];
@@ -103,6 +103,7 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                department_id: user.department_id,
                 created_at: user.created_at
             }
         });
@@ -122,7 +123,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, name, email, role, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, role, department_id, created_at FROM users WHERE id = $1',
             [req.user.userId]
         );
 

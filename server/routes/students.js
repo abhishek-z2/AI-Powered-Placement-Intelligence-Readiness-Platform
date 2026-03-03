@@ -18,12 +18,24 @@ const upload = multer({
     },
 });
 
-// POST /students/upload-resume
+// GET /students/departments — list all departments
+router.get('/departments', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM departments ORDER BY name');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /students/upload-resume — parse PDF and store skills
 router.post('/upload-resume', authenticate, upload.single('resume'), async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ error: 'No PDF file uploaded' });
+        if (!req.file) {
+            return res.status(400).json({ error: 'No resume file uploaded' });
+        }
 
-        // Extract text from PDF
+        // Parse PDF to text
         const pdfData = await pdfParse(req.file.buffer);
         const resumeText = pdfData.text;
 
@@ -31,10 +43,20 @@ router.post('/upload-resume', authenticate, upload.single('resume'), async (req,
             return res.status(400).json({ error: 'Could not extract enough text from PDF' });
         }
 
-        // Extract structured data via Gemini
-        const extracted = await extractResumeData(resumeText);
+        // Fetch user's department
+        const userResult = await pool.query(`
+            SELECT u.department_id, d.name as department_name 
+            FROM users u 
+            LEFT JOIN departments d ON u.department_id = d.id 
+            WHERE u.id = $1`, [req.user.userId]);
 
-        // Normalize skills for storage in DB (lowercase, trim, normalize special chars)
+        const deptContext = userResult.rows[0]?.department_name || 'Computer Science';
+        const deptId = userResult.rows[0]?.department_id;
+
+        // Extract structured data via Gemini with department context
+        const extracted = await extractResumeData(resumeText, deptContext);
+
+        // Normalize skills for storage in DB
         const technicalSkills = (extracted.technical_skills || []).map(normalizeForStorage);
         const softSkills = (extracted.soft_skills || []).map(normalizeForStorage);
         const suggestedRoles = (extracted.suggested_roles || []).map(r => r.toLowerCase().trim());
@@ -42,24 +64,30 @@ router.post('/upload-resume', authenticate, upload.single('resume'), async (req,
         // Compute readiness score
         const overallReadiness = computeOverallReadiness(technicalSkills);
 
-        // Fix: Ensure year and experience_years are valid numbers (not undefined/null strings)
         const yearValue = extracted.year ? parseInt(extracted.year, 10) : null;
         const experienceValue = extracted.experience_years ? parseFloat(extracted.experience_years) : 0;
+        const cgpaValue = extracted.cgpa ? parseFloat(extracted.cgpa) : null;
+        const backlogsValue = extracted.backlogs ? parseInt(extracted.backlogs, 10) : 0;
+        const activityPointsValue = extracted.activity_points ? parseInt(extracted.activity_points, 10) : 0;
 
-        // Insert student into DB with user_id from authenticated user
+        // Insert student into DB with user_id and department_id
         const studentResult = await pool.query(
-            `INSERT INTO students (user_id, name, department, year, experience_years, technical_skills, soft_skills, readiness_score, suggested_roles)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            `INSERT INTO students (user_id, name, department, year, experience_years, technical_skills, soft_skills, readiness_score, suggested_roles, department_id, cgpa, backlogs, activity_points)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
             [
                 req.user.userId,
                 extracted.name || 'Unknown',
-                extracted.department || '',
+                extracted.department || deptContext,
                 yearValue,
                 experienceValue,
                 technicalSkills,
                 softSkills,
                 overallReadiness,
                 suggestedRoles,
+                deptId,
+                cgpaValue,
+                backlogsValue,
+                activityPointsValue
             ]
         );
         const student = studentResult.rows[0];

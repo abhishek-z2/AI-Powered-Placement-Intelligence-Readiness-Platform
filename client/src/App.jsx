@@ -14,12 +14,33 @@ const ROLES = [
   { label: '📊 Placement Officer', value: 'officer' },
 ];
 
+import { useEffect } from 'react';
+import api from './api/index';
+
 // Login/Signup Modal Component
 const AuthModal = ({ isOpen, onClose, mode, setMode, setActiveRole }) => {
   const { login, signup } = useAuth();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'student' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'student', department_id: '' });
+  const [departments, setDepartments] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (mode === 'signup') {
+      const fetchDepts = async () => {
+        try {
+          const res = await api.get('/students/departments');
+          setDepartments(res.data);
+          if (res.data.length > 0) {
+            setFormData(prev => ({ ...prev, department_id: res.data[0].id }));
+          }
+        } catch (err) {
+          console.error('Failed to fetch departments');
+        }
+      };
+      fetchDepts();
+    }
+  }, [mode]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +52,7 @@ const AuthModal = ({ isOpen, onClose, mode, setMode, setActiveRole }) => {
         const result = await login(formData.email, formData.password);
         userRole = result.user.role;
       } else {
-        const result = await signup(formData.name, formData.email, formData.password, formData.role);
+        const result = await signup(formData.name, formData.email, formData.password, formData.role, formData.department_id);
         userRole = result.user.role;
       }
       // Set activeRole to user's role after login/signup
@@ -86,6 +107,18 @@ const AuthModal = ({ isOpen, onClose, mode, setMode, setActiveRole }) => {
             >
               {ROLES.map(r => (
                 <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          )}
+          {mode === 'signup' && formData.role === 'student' && (
+            <select
+              value={formData.department_id}
+              onChange={e => setFormData({ ...formData, department_id: e.target.value })}
+              required
+            >
+              <option value="">Select Department</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
           )}
