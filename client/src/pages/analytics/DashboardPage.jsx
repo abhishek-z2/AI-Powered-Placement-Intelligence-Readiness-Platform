@@ -210,14 +210,18 @@ export default function AnalyticsDashboard() {
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>
                             Median readiness score (%) per role (excluding outliers)
                         </p>
-                        <ResponsiveContainer width="100%" height={280}>
+                        <ResponsiveContainer width="100%" height={320}>
                             <BarChart data={barData} barCategoryGap="20%" margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                                 <XAxis
                                     dataKey="role"
-                                    tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+                                    tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
                                     axisLine={false}
                                     tickLine={false}
+                                    interval={0}
+                                    angle={-30}
+                                    textAnchor="end"
+                                    height={60}
                                 />
                                 <YAxis
                                     domain={[0, 100]}
@@ -322,14 +326,14 @@ export default function AnalyticsDashboard() {
                                 Students with ≥70% score per role
                             </p>
                             {pieData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={280}>
-                                    <PieChart margin={{ top: 0, bottom: 20 }}>
+                                <ResponsiveContainer width="100%" height={380}>
+                                    <PieChart margin={{ top: 0, bottom: 0 }}>
                                         <Pie
                                             data={pieData}
                                             cx="50%"
-                                            cy="45%"
-                                            innerRadius={55}
-                                            outerRadius={85}
+                                            cy="35%"
+                                            innerRadius={60}
+                                            outerRadius={90}
                                             paddingAngle={3}
                                             dataKey="value"
                                         >
@@ -341,10 +345,15 @@ export default function AnalyticsDashboard() {
                                         <Legend
                                             iconType="circle"
                                             verticalAlign="bottom"
-                                            height={36}
-                                            wrapperStyle={{ paddingTop: '20px' }}
+                                            layout="horizontal"
+                                            align="center"
+                                            wrapperStyle={{
+                                                paddingTop: '20px',
+                                                bottom: 0,
+                                                fontSize: '0.75rem'
+                                            }}
                                             formatter={(value) => (
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', paddingRight: '10px' }}>{value}</span>
+                                                <span style={{ color: 'var(--text-secondary)', paddingRight: '8px' }}>{value}</span>
                                             )}
                                         />
                                     </PieChart>
