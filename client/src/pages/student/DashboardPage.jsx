@@ -26,11 +26,27 @@ ChartJS.register(
 );
 
 const ROLE_LABELS = {
+    // TECH
     frontend: '🖥️ Frontend Dev',
     backend: '⚙️ Backend Dev',
     fullstack: '🔗 Full Stack',
     data_analyst: '📊 Data Analyst',
     devops: '🛠️ DevOps',
+    // MECH
+    design_engineer: '📐 Design Engineer',
+    thermal_engineer: '🔥 Thermal Engineer',
+    production_engineer: '🏭 Production Engineer',
+    automotive_engineer: '🏎️ Automotive Engineer',
+    // ECE/EEE
+    embedded_engineer: '📟 Embedded Engineer',
+    vlsi_designer: '💾 VLSI Designer',
+    signal_processing: '📡 Signal Processing',
+    electrical_engineer: '⚡ Electrical Engineer',
+    // CIVIL
+    structural_engineer: '🏗️ Structural Engineer',
+    bim_modeler: '🏢 BIM Modeler',
+    site_engineer: '🚜 Site Engineer',
+    environmental_engineer: '🌿 Environmental Engineer',
 };
 
 function ScoreBadge({ score }) {
@@ -68,6 +84,7 @@ export default function DashboardPage() {
     const [history, setHistory] = useState([]);
     const [projects, setProjects] = useState([]);
     const [roleReadiness, setRoleReadiness] = useState({});
+    const [selectedDomain, setSelectedDomain] = useState('tech');
     const [questions, setQuestions] = useState([]);
     const [questLoading, setQuestLoading] = useState(false);
     const [questError, setQuestError] = useState('');
@@ -103,6 +120,14 @@ export default function DashboardPage() {
             setStudent(studentData);
             setProjects(projects || []);
             setRoleReadiness(roleReadiness || {});
+
+            // Auto-select domain based on department
+            const dept = studentData.department?.toLowerCase() || '';
+            if (dept.includes('mech')) setSelectedDomain('mechanical');
+            else if (dept.includes('civil')) setSelectedDomain('civil');
+            else if (dept.includes('electronics') || dept.includes('electrical') || dept.includes('ece') || dept.includes('eee')) setSelectedDomain('ece_eee');
+            else setSelectedDomain('tech');
+
             setError('');
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to load student profile.');
@@ -349,9 +374,7 @@ export default function DashboardPage() {
     }
 
     // --- Render Report View (with ID) ---
-    const overallScore = Object.values(roleReadiness).length
-        ? Object.values(roleReadiness).reduce((s, v) => s + v, 0) / Object.values(roleReadiness).length
-        : 0;
+    const overallScore = student.readiness_score || 0;
 
     return (
         <div className="dashboard-page">
@@ -375,6 +398,24 @@ export default function DashboardPage() {
                         Delete Resume
                     </button>
                     <ScoreBadge score={overallScore} />
+                </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: '1.25rem' }}>
+                <div className="section-title">🎓 Academic Profile (KTU)</div>
+                <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    <div style={{ textAlign: 'center', borderRight: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: (student.cgpa >= 8.5 ? 'var(--accent-green)' : student.cgpa >= 7.0 ? 'var(--accent-secondary)' : 'var(--accent-orange)') }}>
+                            {student.cgpa || 'N/A'}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>CGPA</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: (student.backlogs > 0 ? 'var(--accent-red)' : 'var(--accent-green)') }}>
+                            {student.backlogs ?? 0}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Backlogs</div>
+                    </div>
                 </div>
             </div>
 
@@ -405,12 +446,53 @@ export default function DashboardPage() {
             </div>
 
             <div className="card" style={{ marginBottom: '1.25rem' }}>
-                <div className="section-title">🎯 Role Readiness Breakdown</div>
-                {Object.entries(roleReadiness).length > 0
-                    ? Object.entries(roleReadiness).map(([role, score]) => (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div className="section-title" style={{ marginBottom: 0 }}>🎯 Role Readiness Breakdown</div>
+                    <div className="domain-tabs">
+                        {[
+                            { id: 'tech', label: 'Tech' },
+                            { id: 'mechanical', label: 'Mechanical' },
+                            { id: 'civil', label: 'Civil' },
+                            { id: 'ece_eee', label: 'ECE / EEE' }
+                        ].map(d => (
+                            <button
+                                key={d.id}
+                                className={`tab-btn ${selectedDomain === d.id ? 'active' : ''}`}
+                                onClick={() => setSelectedDomain(d.id)}
+                            >
+                                {d.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {Object.entries(roleReadiness).filter(([role]) => {
+                    const tech = ['frontend', 'backend', 'fullstack', 'data_analyst', 'devops'];
+                    const mech = ['design_engineer', 'thermal_engineer', 'production_engineer', 'automotive_engineer'];
+                    const civil = ['structural_engineer', 'bim_modeler', 'site_engineer', 'environmental_engineer'];
+                    const ece = ['embedded_engineer', 'vlsi_designer', 'signal_processing', 'electrical_engineer'];
+
+                    if (selectedDomain === 'tech') return tech.includes(role);
+                    if (selectedDomain === 'mechanical') return mech.includes(role);
+                    if (selectedDomain === 'civil') return civil.includes(role);
+                    if (selectedDomain === 'ece_eee') return ece.includes(role);
+                    return true;
+                }).length > 0
+                    ? Object.entries(roleReadiness).filter(([role]) => {
+                        const tech = ['frontend', 'backend', 'fullstack', 'data_analyst', 'devops'];
+                        const mech = ['design_engineer', 'thermal_engineer', 'production_engineer', 'automotive_engineer'];
+                        const civil = ['structural_engineer', 'bim_modeler', 'site_engineer', 'environmental_engineer'];
+                        const ece = ['embedded_engineer', 'vlsi_designer', 'signal_processing', 'electrical_engineer'];
+
+                        if (selectedDomain === 'tech') return tech.includes(role);
+                        if (selectedDomain === 'mechanical') return mech.includes(role);
+                        if (selectedDomain === 'civil') return civil.includes(role);
+                        if (selectedDomain === 'ece_eee') return ece.includes(role);
+                        return true;
+                    }).map(([role, score]) => (
                         <RoleBar key={role} role={role} score={score} />
                     ))
-                    : <div className="empty-text">No role data available.</div>
+                    : <div className="empty-text">No role data available for this domain.</div>
                 }
             </div>
 

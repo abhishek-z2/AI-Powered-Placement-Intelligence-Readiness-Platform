@@ -28,8 +28,8 @@ export const AuthProvider = ({ children }) => {
         return response.data;
     };
 
-    const signup = async (name, email, password, role) => {
-        const response = await authAPI.signup({ name, email, password, role });
+    const signup = async (name, email, password, role, department_id) => {
+        const response = await authAPI.signup({ name, email, password, role, department_id });
         setUser(response.data.user);
         return response.data;
     };

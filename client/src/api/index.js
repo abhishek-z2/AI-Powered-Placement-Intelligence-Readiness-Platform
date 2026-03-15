@@ -21,6 +21,8 @@ export const studentsAPI = {
     }),
     getAll: () => api.get('/students'),
     getById: (id) => api.get(`/students/${id}`),
+    getHistory: () => api.get('/students/my-history'),
+    getDepartments: () => api.get('/students/departments'),
     getInterviewQuestions: (id) => api.post(`/students/${id}/interview-questions`),
 };
 
