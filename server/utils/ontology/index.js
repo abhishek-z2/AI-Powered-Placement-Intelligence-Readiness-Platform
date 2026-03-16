@@ -51,6 +51,70 @@ function normalizeSkill(raw) {
     return aliases[lowered] ?? lowered;
 }
 
+/**
+ * Jaro-Winkler Similarity — as cited in Maree et al. (base paper), Section 4.6.
+ * Used as a fuzzy fallback when the ontology graph finds no structural relation.
+ *
+ * Jaro distance: measures character-level overlap and transpositions.
+ * Winkler prefix bonus: boosts score for strings sharing a common prefix (max 4 chars).
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} similarity in [0, 1]
+ */
+function jaroWinkler(a, b) {
+    if (a === b) return 1.0;
+    if (!a || !b) return 0.0;
+
+    const lenA = a.length;
+    const lenB = b.length;
+    const matchDistance = Math.floor(Math.max(lenA, lenB) / 2) - 1;
+
+    const aMatches = new Array(lenA).fill(false);
+    const bMatches = new Array(lenB).fill(false);
+
+    let matches = 0;
+    let transpositions = 0;
+
+    // Step 1: Find matching characters within the match window
+    for (let i = 0; i < lenA; i++) {
+        const start = Math.max(0, i - matchDistance);
+        const end = Math.min(i + matchDistance + 1, lenB);
+        for (let j = start; j < end; j++) {
+            if (bMatches[j] || a[i] !== b[j]) continue;
+            aMatches[i] = true;
+            bMatches[j] = true;
+            matches++;
+            break;
+        }
+    }
+
+    if (matches === 0) return 0.0;
+
+    // Step 2: Count transpositions
+    let k = 0;
+    for (let i = 0; i < lenA; i++) {
+        if (!aMatches[i]) continue;
+        while (!bMatches[k]) k++;
+        if (a[i] !== b[k]) transpositions++;
+        k++;
+    }
+
+    // Step 3: Jaro score
+    const jaro = (
+        matches / lenA +
+        matches / lenB +
+        (matches - transpositions / 2) / matches
+    ) / 3;
+
+    // Step 4: Winkler prefix bonus (p = 0.1, max prefix = 4)
+    let prefixLen = 0;
+    const maxPrefix = Math.min(4, Math.min(lenA, lenB));
+    while (prefixLen < maxPrefix && a[prefixLen] === b[prefixLen]) prefixLen++;
+
+    return jaro + prefixLen * 0.1 * (1 - jaro);
+}
+
 const normalizeForStorage = normalizeSkill;
 
 function getAncestors(skill) {
@@ -79,19 +143,32 @@ function getSkillWeight(requiredSkill, studentSkill) {
     const req = normalizeSkill(requiredSkill);
     const stu = normalizeSkill(studentSkill);
 
-    // 1.0 — exact
+    // Layer 1 — Exact match
     if (stu === req) return 1.0;
 
-    // 0.8 / 0.7 — hierarchy: walk ancestors of STUDENT skill
+    // Layer 2 / 3 — Hierarchy: walk ancestors of STUDENT skill
     const ancestors = getAncestors(stu);
-    if (ancestors[0] === req) return 0.8;          // direct parent
-    if (ancestors.slice(1).includes(req)) return 0.7; // indirect ancestor
+    if (ancestors[0] === req) return 0.8;              // direct parent
+    if (ancestors.slice(1).includes(req)) return 0.7;  // indirect ancestor
 
-    // 0.6 — sibling (same tech family)
+    // Layer 4a — Check if required skill IS an ancestor of student skill
+    // (e.g. student has "react", JD asks for "frontend_framework")
+    const reqAncestors = getAncestors(req);
+    if (ancestors.includes(req) || reqAncestors.includes(stu)) return 0.7;
+
+    // Layer 4b — Sibling match (same tech family)
     if (areSiblings(stu, req)) return 0.6;
 
-    // 0.5 — domain match only
+    // Layer 4c — Domain match only
     if (shareDomain(stu, req)) return 0.5;
+
+    // Layer 5 — Jaro-Winkler fuzzy fallback (Maree et al., Section 4.6)
+    // Catches surface variants the alias map may have missed (e.g. "postgress" vs "postgres",
+    // "nodeJS" vs "node.js" after normalization, or multi-word overlaps).
+    // A high JW score (>= 0.88) earns discounted partial credit capped at 0.35,
+    // preventing false-positive inflation on very short tokens.
+    const jwSim = jaroWinkler(stu, req);
+    if (jwSim >= 0.88) return Math.min(jwSim * 0.4, 0.35);
 
     return 0.0;
 }
@@ -188,6 +265,7 @@ module.exports = {
     getAncestors,
     areSiblings,
     shareDomain,
+    jaroWinkler,
     getSkillWeight,
     getBestWeight,
     computeScore
