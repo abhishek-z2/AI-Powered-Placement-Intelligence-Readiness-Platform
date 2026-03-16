@@ -1299,3 +1299,9 @@ textarea:focus {
   border-color: var(--accent-primary);
   color: var(--accent-secondary);
 }
+
+.chip-role {
+  border-color: var(--accent-secondary);
+  background: rgba(0, 245, 255, 0.05);
+  color: var(--accent-secondary);
+}

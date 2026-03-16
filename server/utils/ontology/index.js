@@ -168,6 +168,64 @@ function bfsShortestPath(source, target, maxDepth = 4) {
     return Infinity;
 }
 
+/**
+ * Builds a subgraph (nodes and links) centered around a set of student skills.
+ * Used for "Skill Neighborhood" visualizations.
+ *
+ * @param {string[]} seeds - student's normalized skills
+ * @param {number} [depth=1] - how many hops to traverse
+ * @returns {{ nodes: any[], links: any[] }} graph data
+ */
+function getSkillNeighborhood(seeds, depth = 1) {
+    const normalizedSeeds = seeds.map(normalizeSkill);
+    const nodes = new Map(); // id -> { id, label, type, isSeed }
+    const links = new Set(); // "id1|id2"
+
+    const queue = [];
+    normalizedSeeds.forEach(s => {
+        if (adjacencyList.has(s)) {
+            nodes.set(s, { id: s, label: s, type: 'skill', isSeed: true });
+            queue.push([s, 0]);
+        }
+    });
+
+    while (queue.length > 0) {
+        const [node, currentDepth] = queue.shift();
+        if (currentDepth >= depth) continue;
+
+        const neighbors = adjacencyList.get(node) || [];
+        for (const neighbor of neighbors) {
+            // Add Node
+            if (!nodes.has(neighbor)) {
+                let type = 'skill';
+                if (neighbor.startsWith('__domain__')) type = 'domain';
+                nodes.set(neighbor, {
+                    id: neighbor,
+                    label: neighbor.replace('__domain__', ''),
+                    type,
+                    isSeed: normalizedSeeds.includes(neighbor)
+                });
+            }
+
+            // Add Link (sorted to avoid duplicates in undirected graph)
+            const linkId = [node, neighbor].sort().join('|');
+            links.add(linkId);
+
+            if (currentDepth + 1 < depth) {
+                queue.push([neighbor, currentDepth + 1]);
+            }
+        }
+    }
+
+    return {
+        nodes: Array.from(nodes.values()),
+        links: Array.from(links).map(id => {
+            const [source, target] = id.split('|');
+            return { source, target };
+        })
+    };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // JARO-WINKLER FUZZY FALLBACK
 // ─────────────────────────────────────────────────────────────────────────────
@@ -440,5 +498,6 @@ module.exports = {
     buildAdjacencyList,
     getSkillWeight,
     getBestWeight,
-    computeScore
+    computeScore,
+    getSkillNeighborhood
 };

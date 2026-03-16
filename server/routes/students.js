@@ -4,7 +4,7 @@ const pdfParse = require('pdf-parse');
 const router = express.Router();
 const pool = require('../db/pool');
 const { extractResumeData, generateInterviewQuestions, generateSkillRoadmap } = require('../services/geminiService');
-const { normalizeForStorage } = require('../utils/skillOntology');
+const { normalizeForStorage, getSkillNeighborhood } = require('../utils/skillOntology');
 const { computeRoleReadiness, computeOverallReadiness } = require('../services/rankingService');
 const { authenticate } = require('../middleware/authMiddleware');
 
@@ -223,27 +223,10 @@ router.get('/:id', authenticate, async (req, res) => {
         const projectsResult = await pool.query('SELECT * FROM projects WHERE student_id = $1', [id]);
         const roleReadiness = computeRoleReadiness(student.technical_skills || []);
 
-        // --- Rarity Calculation (Minimal implementation) ---
-        // Get global counts for skills
-        const globalSkillsResult = await pool.query('SELECT technical_skills FROM students');
-        const skillCounts = {};
-        let totalStudents = globalSkillsResult.rows.length;
-
-        globalSkillsResult.rows.forEach(row => {
-            (row.technical_skills || []).forEach(s => {
-                skillCounts[s] = (skillCounts[s] || 0) + 1;
-            });
-        });
-
-        // Flag skills as rare if they appear in < 10% (or < 2 students if tiny pool)
-        const threshold = Math.max(2, Math.floor(totalStudents * 0.1));
-        const rareSkills = (student.technical_skills || []).filter(s => (skillCounts[s] || 0) <= threshold);
-
         res.json({
             ...student,
             roleReadiness,
-            projects: projectsResult.rows,
-            rareSkills
+            projects: projectsResult.rows
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -273,6 +256,28 @@ router.post('/:id/interview-questions', authenticate, async (req, res) => {
         res.json({ questions });
     } catch (err) {
         console.error('Interview questions error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /students/:id/skill-graph
+router.get('/:id/skill-graph', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const studentResult = await pool.query('SELECT technical_skills, user_id FROM students WHERE id = $1', [id]);
+        if (studentResult.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
+
+        const studentData = studentResult.rows[0];
+
+        // Ownership check
+        if (req.user.role === 'student' && studentData.user_id !== req.user.userId) {
+            return res.status(403).json({ error: 'Unauthorized access' });
+        }
+
+        const graph = getSkillNeighborhood(studentData.technical_skills || [], 2);
+        res.json(graph);
+    } catch (err) {
+        console.error('Skill graph error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

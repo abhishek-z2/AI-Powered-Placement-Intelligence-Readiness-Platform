@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/index';
 import {
@@ -22,6 +22,7 @@ import {
     PolarRadiusAxis,
     ResponsiveContainer
 } from 'recharts';
+import ForceGraph2D from 'react-force-graph-2d';
 
 ChartJS.register(
     CategoryScale,
@@ -101,6 +102,11 @@ export default function DashboardPage() {
     const [roadmap, setRoadmap] = useState(null);
     const [roadLoading, setRoadLoading] = useState(false);
     const [roadError, setRoadError] = useState('');
+    const [showGraph, setShowGraph] = useState(false);
+    const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+    const [graphLoading, setGraphLoading] = useState(false);
+    const [graphWidth, setGraphWidth] = useState(500);
+    const graphContainerRef = useRef(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -206,6 +212,36 @@ export default function DashboardPage() {
             setRoadLoading(false);
         }
     };
+
+    const fetchSkillGraph = async () => {
+        if (!id || graphData.nodes.length > 0) {
+            setShowGraph(!showGraph);
+            return;
+        }
+        setGraphLoading(true);
+        try {
+            const res = await api.get(`/students/${id}/skill-graph`);
+            setGraphData(res.data);
+            setShowGraph(true);
+        } catch (err) {
+            console.error('Failed to fetch skill graph', err);
+        } finally {
+            setGraphLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showGraph && graphContainerRef.current) {
+            const handleResize = () => {
+                if (graphContainerRef.current) {
+                    setGraphWidth(graphContainerRef.current.offsetWidth);
+                }
+            };
+            handleResize();
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+        }
+    }, [showGraph]);
 
     if (loading) {
         return (
@@ -401,7 +437,16 @@ export default function DashboardPage() {
     }
 
     // --- Render Report View (with ID) ---
-    const overallScore = student.readiness_score || 0;
+    if (id && !student) {
+        return (
+            <div className="spinner-wrap">
+                <div className="spinner" />
+                <span className="spinner-text">Loading student report...</span>
+            </div>
+        );
+    }
+
+    const overallScore = student?.readiness_score || 0;
 
     return (
         <div className="dashboard-page">
@@ -477,40 +522,97 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
-                <div className="card">
-                    <div className="section-title">⚡ Technical Skills</div>
-                    <div className="chips-group">
-                        {student.technical_skills?.length > 0
-                            ? student.technical_skills.map((s, i) => {
-                                const isRare = student.rareSkills?.includes(s);
-                                return (
-                                    <div key={i} style={{ position: 'relative' }}>
-                                        <span className={`chip chip-tech ${isRare ? 'chip-rare' : ''}`}>
-                                            {s}
-                                        </span>
-                                        {isRare && (
-                                            <span style={{
-                                                position: 'absolute',
-                                                top: '-6px',
-                                                right: '-6px',
-                                                fontSize: '0.6rem',
-                                                background: 'var(--accent-orange)',
-                                                color: '#000',
-                                                padding: '1px 4px',
-                                                borderRadius: '4px',
-                                                fontWeight: '800',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                                                zIndex: 1
-                                            }}>
-                                                ✨ RARE
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })
-                            : <span className="empty-text">None extracted</span>
-                        }
+                <div className="card" style={{ marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div className="section-title" style={{ marginBottom: 0 }}>⚡ Technical Skills</div>
+                        <button
+                            className={`btn btn-sm ${showGraph ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={fetchSkillGraph}
+                            disabled={graphLoading}
+                        >
+                            {graphLoading ? '⌛' : showGraph ? '📄 Show Chips' : '🕸️ Explore Neighborhood'}
+                        </button>
                     </div>
+
+                    {showGraph ? (
+                        <div ref={graphContainerRef} style={{ height: '400px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                            <ForceGraph2D
+                                graphData={graphData}
+                                width={graphWidth}
+                                height={400}
+                                nodeLabel="label"
+                                nodeAutoColorBy="type"
+                                linkLabel={() => ""}
+                                backgroundColor="rgba(0,0,0,0)"
+                                nodeCanvasObject={(node, ctx, globalScale) => {
+                                    const label = node.label;
+                                    const fontSize = 12 / globalScale;
+                                    ctx.font = `${fontSize}px Inter, sans-serif`;
+                                    const textWidth = ctx.measureText(label).width;
+                                    const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.4);
+
+                                    ctx.fillStyle = node.isSeed ? '#6366f1' : 'rgba(255, 255, 255, 0.05)';
+                                    if (!node.isSeed) {
+                                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                                        ctx.lineWidth = 1 / globalScale;
+                                    }
+
+                                    // Rounded Rect for background
+                                    const x = node.x - bckgDimensions[0] / 2;
+                                    const y = node.y - bckgDimensions[1] / 2;
+                                    const w = bckgDimensions[0];
+                                    const h = bckgDimensions[1];
+                                    const r = 6 / globalScale;
+
+                                    ctx.beginPath();
+                                    ctx.moveTo(x + r, y);
+                                    ctx.lineTo(x + w - r, y);
+                                    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                                    ctx.lineTo(x + w, y + h - r);
+                                    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                                    ctx.lineTo(x + r, y + h);
+                                    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                                    ctx.lineTo(x, y + r);
+                                    ctx.quadraticCurveTo(x, y, x + r, y);
+                                    ctx.closePath();
+                                    ctx.fill();
+                                    if (!node.isSeed) ctx.stroke();
+                                    if (node.isSeed) {
+                                        ctx.shadowColor = '#6366f1';
+                                        ctx.shadowBlur = 10 / globalScale;
+                                    }
+
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillStyle = node.isSeed ? '#fff' : '#94a3b8';
+                                    ctx.fillText(label, node.x, node.y);
+
+                                    // Reset shadow
+                                    ctx.shadowBlur = 0;
+
+                                    node.__bckgDimensions = bckgDimensions; // to re-use in nodePointerAreaPaint
+                                }}
+                                nodePointerAreaPaint={(node, color, ctx) => {
+                                    ctx.fillStyle = color;
+                                    const bckgDimensions = node.__bckgDimensions;
+                                    bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
+                                }}
+                                linkColor={() => 'rgba(255, 255, 255, 0.05)'}
+                                linkDirectionalParticles={2}
+                                linkDirectionalParticleSpeed={0.005}
+                                linkDirectionalParticleWidth={2}
+                            />
+                        </div>
+                    ) : (
+                        <div className="chips-group">
+                            {student.technical_skills?.length > 0
+                                ? student.technical_skills.map((s, i) => (
+                                    <span key={i} className="chip chip-tech">{s}</span>
+                                ))
+                                : <span className="empty-text">None extracted</span>
+                            }
+                        </div>
+                    )}
                 </div>
 
                 <div className="card">
@@ -603,7 +705,7 @@ export default function DashboardPage() {
                                     <div className="project-name">{p.name}</div>
                                     <div className="chips-group" style={{ marginTop: '0.4rem' }}>
                                         {p.tech_stack?.map((t, j) => (
-                                            <span key={j} className={`chip chip-tech ${student.rareSkills?.includes(t) ? 'chip-rare' : ''}`} style={{ fontSize: '0.7rem' }}>{t}</span>
+                                            <span key={j} className="chip chip-tech" style={{ fontSize: '0.7rem' }}>{t}</span>
                                         ))}
                                     </div>
                                     {p.description && (
