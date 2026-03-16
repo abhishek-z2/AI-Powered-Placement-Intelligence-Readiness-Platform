@@ -3,10 +3,11 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const router = express.Router();
 const pool = require('../db/pool');
-const { extractResumeData, generateInterviewQuestions } = require('../services/geminiService');
+const { extractResumeData, generateInterviewQuestions, generateSkillRoadmap } = require('../services/geminiService');
 const { normalizeForStorage } = require('../utils/skillOntology');
 const { computeRoleReadiness, computeOverallReadiness } = require('../services/rankingService');
 const { authenticate } = require('../middleware/authMiddleware');
+
 
 // Multer — store file in memory for pdf-parse
 const upload = multer({
@@ -251,6 +252,39 @@ router.post('/:id/interview-questions', authenticate, async (req, res) => {
         res.json({ questions });
     } catch (err) {
         console.error('Interview questions error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /students/:id/roadmap
+router.post('/:id/roadmap', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { targetRole } = req.body;
+
+        if (!targetRole) {
+            return res.status(400).json({ error: 'targetRole is required' });
+        }
+
+        const studentResult = await pool.query('SELECT * FROM students WHERE id = $1', [id]);
+        if (studentResult.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
+
+        const student = studentResult.rows[0];
+
+        // Ownership check
+        if (req.user.role === 'student' && student.user_id !== req.user.userId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const roadmap = await generateSkillRoadmap(
+            student.name,
+            student.technical_skills || [],
+            targetRole
+        );
+
+        res.json({ roadmap });
+    } catch (err) {
+        console.error('Skill roadmap error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

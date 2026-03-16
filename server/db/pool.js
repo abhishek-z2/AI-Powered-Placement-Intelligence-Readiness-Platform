@@ -4,9 +4,10 @@ const { Pool } = require('pg');
 
 // Try to load .env from different possible locations
 const envPaths = [
-    path.join(__dirname, '..', '.env'),
-    path.join(__dirname, '.env'),
-    path.join(process.cwd(), '.env'),
+    path.join(__dirname, '..', '..', '.env'), // Project root
+    path.join(__dirname, '..', '.env'),       // server root
+    path.join(__dirname, '.env'),            // db folder
+    path.join(process.cwd(), '.env'),        // Current working directory
 ];
 
 let envLoaded = false;

@@ -210,4 +210,53 @@ Mix of: technical (60%), behavioral (20%), situational (20%).
   return JSON.parse(cleaned);
 }
 
-module.exports = { extractResumeData, extractJDData, generateInterviewQuestions };
+/**
+ * Generate a 4-week skill roadmap for a student to bridge the gap for a target role.
+ */
+async function generateSkillRoadmap(studentName, currentSkills, targetRole) {
+  const roleSkillMap = require('../utils/roleSkillMap');
+  const roleSkills = roleSkillMap[targetRole] || [];
+
+  const prompt = `
+    You are a world-class career mentor and technical educator. A student named ${studentName} wants to become a ${targetRole.replace('_', ' ')}.
+    
+    Current Skills: ${currentSkills.join(', ')}
+    Target Required Skills for ${targetRole}: ${roleSkills.join(', ')}
+    
+    Task: Identify the skill gaps and generate a personalized 4-week learning roadmap to make them "job ready" (>=70% match) for this role.
+    
+    For each week, provide:
+    1. A focus area (e.g., "Mastering Backend Foundations").
+    2. Specific topics to learn (e.g., ["RESTful API Design", "SQL Joins"]).
+    3. A small practical project or task to complete (e.g., "Build a mini TODO API with Postgres").
+    4. 2-3 high-quality learning resources (links to official documentation, MDN, or high-quality free tutorial sites like freeCodeCamp, roadmap.sh). No YouTube links unless they are from official channels.
+    
+    Return ONLY a valid JSON object. No extra text.
+    Format:
+    {
+      "targetRole": "${targetRole}",
+      "weeks": [
+        {
+          "week": 1,
+          "focus": "...",
+          "topics": ["...", "..."],
+          "task": "...",
+          "resources": [
+            {"title": "...", "url": "..."}
+          ]
+        }
+      ]
+    }
+    Rules:
+    - Generate exactly 4 weeks.
+    - Resources MUST have titles and valid URLs.
+  `;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+
+  return JSON.parse(cleaned);
+}
+
+module.exports = { extractResumeData, extractJDData, generateInterviewQuestions, generateSkillRoadmap };

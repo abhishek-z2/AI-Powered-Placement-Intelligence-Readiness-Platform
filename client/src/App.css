@@ -1182,3 +1182,93 @@ textarea:focus {
   opacity: 1;
   color: var(--accent-secondary) !important;
 }
+
+/* ====== ROADMAP TIMELINE ====== */
+.roadmap-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  margin-left: 1.5rem;
+  margin-top: 1rem;
+}
+
+.roadmap-timeline::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--border);
+}
+
+.roadmap-week {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  position: relative;
+  transition: var(--transition);
+}
+
+.roadmap-week:hover {
+  border-color: var(--accent-primary);
+  transform: translateX(4px);
+  background: var(--bg-card);
+}
+
+.roadmap-week::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 24px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  border: 2px solid var(--bg-primary);
+  box-shadow: 0 0 10px rgba(108, 99, 255, 0.3);
+}
+
+.roadmap-week-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.resource-link {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent-secondary);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.resource-link:hover {
+  background: rgba(108, 99, 255, 0.1);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.chip-clickable {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  transition: var(--transition);
+  color: var(--text-secondary);
+}
+
+.chip-clickable:hover {
+  background: rgba(108, 99, 255, 0.1);
+  border-color: var(--accent-primary);
+  color: var(--accent-secondary);
+}

@@ -88,6 +88,9 @@ export default function DashboardPage() {
     const [questions, setQuestions] = useState([]);
     const [questLoading, setQuestLoading] = useState(false);
     const [questError, setQuestError] = useState('');
+    const [roadmap, setRoadmap] = useState(null);
+    const [roadLoading, setRoadLoading] = useState(false);
+    const [roadError, setRoadError] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -177,6 +180,20 @@ export default function DashboardPage() {
             setQuestError(err.response?.data?.error || 'Failed to generate questions.');
         } finally {
             setQuestLoading(false);
+        }
+    };
+
+    const handleGenerateRoadmap = async (targetRole) => {
+        if (!id) return;
+        setRoadLoading(true);
+        setRoadError('');
+        try {
+            const res = await api.post(`/students/${id}/roadmap`, { targetRole });
+            setRoadmap(res.data.roadmap || null);
+        } catch (err) {
+            setRoadError(err.response?.data?.error || 'Failed to generate roadmap.');
+        } finally {
+            setRoadLoading(false);
         }
     };
 
@@ -531,6 +548,86 @@ export default function DashboardPage() {
                         <div className="empty-text">No projects found.</div>
                     )}
                 </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: '1.25rem' }}>
+                <div className="dash-questions-header">
+                    <div>
+                        <div className="section-title">🗺️ Personal Skill Roadmap</div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                            Bridge the gap to your dream role with a 4-week AI-powered plan
+                        </p>
+                    </div>
+                </div>
+
+                {!roadmap && !roadLoading && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>Select a target role to generate your roadmap:</p>
+                        <div className="chips-group">
+                            {Object.keys(ROLE_LABELS).map((role) => (
+                                <button
+                                    key={role}
+                                    className="chip chip-clickable"
+                                    onClick={() => handleGenerateRoadmap(role)}
+                                    disabled={roadLoading}
+                                >
+                                    {ROLE_LABELS[role]}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {roadLoading && (
+                    <div className="empty-state" style={{ padding: '3rem 0' }}>
+                        <div className="spinner" style={{ margin: '0 auto 1rem' }} />
+                        <div className="empty-text">Building your personalized roadmap...</div>
+                    </div>
+                )}
+
+                {roadError && <div className="alert alert-error" style={{ marginTop: '1rem' }}>{roadError}</div>}
+
+                {roadmap && (
+                    <div className="roadmap-container" style={{ marginTop: '2rem' }}>
+                        <div className="roadmap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 style={{ margin: 0 }}>Projected Path to {ROLE_LABELS[roadmap.targetRole] || roadmap.targetRole}</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setRoadmap(null)}>Change Role</button>
+                        </div>
+
+                        <div className="roadmap-timeline">
+                            {roadmap.weeks.map((week, idx) => (
+                                <div key={idx} className="roadmap-week">
+                                    <div className="roadmap-week-num">Week {week.week}</div>
+                                    <div className="roadmap-week-content">
+                                        <div className="roadmap-focus" style={{ fontWeight: '600', color: 'var(--accent-indigo)', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                                            {week.focus}
+                                        </div>
+                                        <div className="roadmap-topics" style={{ marginBottom: '0.8rem' }}>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Topics:</span>
+                                            <div className="chips-group" style={{ marginTop: '0.3rem' }}>
+                                                {week.topics.map((t, i) => <span key={i} className="chip chip-tech" style={{ fontSize: '0.75rem' }}>{t}</span>)}
+                                            </div>
+                                        </div>
+                                        <div className="roadmap-task" style={{ marginBottom: '1rem', padding: '0.8rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: '3px solid var(--accent-green)' }}>
+                                            <span style={{ fontWeight: '500', display: 'block', marginBottom: '0.2rem' }}>🔨 Weekly Task:</span>
+                                            <span style={{ fontSize: '0.9rem' }}>{week.task}</span>
+                                        </div>
+                                        <div className="roadmap-resources">
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resources:</span>
+                                            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                                                {week.resources.map((res, i) => (
+                                                    <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                                                        {res.title} ↗
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="card">
