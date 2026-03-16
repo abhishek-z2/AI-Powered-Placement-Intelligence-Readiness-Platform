@@ -399,6 +399,21 @@ tr:hover td {
   background: rgba(108, 99, 255, 0.04);
 }
 
+.clickable-row {
+  transition: var(--transition);
+}
+
+.clickable-row:hover {
+  background: rgba(108, 99, 255, 0.08);
+  transform: scale(1.002);
+  position: relative;
+  z-index: 1;
+}
+
+.clickable-row:active {
+  transform: scale(0.998);
+}
+
 /* ====== GRID LAYOUTS ====== */
 .grid-2 {
   display: grid;
@@ -428,6 +443,18 @@ tr:hover td {
   letter-spacing: 0.12em;
   color: var(--text-muted);
   margin-bottom: 0.875rem;
+}
+
+.chip-rare {
+  border-color: var(--accent-orange) !important;
+  background: rgba(245, 158, 11, 0.1) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
+}
+
+.grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
 }
 
 /* ====== STAT CARD ====== */

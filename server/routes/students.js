@@ -223,7 +223,28 @@ router.get('/:id', authenticate, async (req, res) => {
         const projectsResult = await pool.query('SELECT * FROM projects WHERE student_id = $1', [id]);
         const roleReadiness = computeRoleReadiness(student.technical_skills || []);
 
-        res.json({ ...student, roleReadiness, projects: projectsResult.rows });
+        // --- Rarity Calculation (Minimal implementation) ---
+        // Get global counts for skills
+        const globalSkillsResult = await pool.query('SELECT technical_skills FROM students');
+        const skillCounts = {};
+        let totalStudents = globalSkillsResult.rows.length;
+
+        globalSkillsResult.rows.forEach(row => {
+            (row.technical_skills || []).forEach(s => {
+                skillCounts[s] = (skillCounts[s] || 0) + 1;
+            });
+        });
+
+        // Flag skills as rare if they appear in < 10% (or < 2 students if tiny pool)
+        const threshold = Math.max(2, Math.floor(totalStudents * 0.1));
+        const rareSkills = (student.technical_skills || []).filter(s => (skillCounts[s] || 0) <= threshold);
+
+        res.json({
+            ...student,
+            roleReadiness,
+            projects: projectsResult.rows,
+            rareSkills
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

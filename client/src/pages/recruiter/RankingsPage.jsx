@@ -210,10 +210,15 @@ function RankingsPage() {
                                 </thead>
                                 <tbody>
                                     {rankings.map((s, i) => (
-                                        <tr key={s.id}>
+                                        <tr
+                                            key={s.id}
+                                            onClick={() => navigate(`/student/dashboard/${s.id}`)}
+                                            style={{ cursor: 'pointer' }}
+                                            className="clickable-row"
+                                        >
                                             <td><RankBadge rank={i + 1} /></td>
                                             <td style={{ minWidth: '180px' }}>
-                                                <div style={{ fontWeight: 600 }}>{s.name}</div>
+                                                <div style={{ fontWeight: 600, color: 'var(--accent-secondary)' }}>{s.name}</div>
                                                 {s.department && (
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                         {s.department}{s.year ? ` · Year ${s.year}` : ''}
